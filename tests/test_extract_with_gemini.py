@@ -21,7 +21,7 @@ def test_extract_endpoint_with_gemini_analysis():
         "resume": "Sample resume",
         "timeline": [
             {
-                "event_id": "e1",
+                "event_id": 1,
                 "event_name": "Petition",
                 "event_description": "Initial petition filed",
                 "event_date": "2024-01-01",
@@ -31,7 +31,7 @@ def test_extract_endpoint_with_gemini_analysis():
         ],
         "evidence": [
             {
-                "evidence_id": "d1",
+                "evidence_id": 10,
                 "evidence_name": "Contract",
                 "evidence_flaw": "Illegible signature",
                 "evidence_page_init": 10,
@@ -57,4 +57,4 @@ def test_extract_endpoint_with_gemini_analysis():
     assert "gemini_analysis" in stages
     # Evidence list forwarded
     assert len(data["evidence"]) == 1
-    assert data["evidence"][0]["evidence_id"] == "d1"
+    assert data["evidence"][0]["evidence_id"] == 10

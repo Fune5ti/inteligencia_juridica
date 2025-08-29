@@ -5,7 +5,7 @@ from src.infrastructure.gemini_client import GeminiClient
 def test_gemini_client_validates_case_extraction_success():
     client = GeminiClient(api_key="dummy", model="gemini-1.5-flash")
 
-    fake_raw = '{"resume": "r", "timeline": [{"event_id": "e1", "event_name": "n", "event_description": "d", "event_date": "2024-01-01", "event_page_init": 1, "event_page_end": 2}], "evidence": [{"evidence_id": "x1", "evidence_name": "Contract", "evidence_flaw": "None", "evidence_page_init": 3, "evidence_page_end": 4}]}'
+    fake_raw = '{"resume": "r", "timeline": [{"event_id": 1, "event_name": "n", "event_description": "d", "event_date": "2024-01-01", "event_page_init": 1, "event_page_end": 2}], "evidence": [{"evidence_id": 10, "evidence_name": "Contract", "evidence_flaw": "None", "evidence_page_init": 3, "evidence_page_end": 4}]}'
 
     mock_file = Mock(uri="file://abc", mime_type="application/pdf", name="file123", state=Mock(name="COMPLETED"))
     mock_model = Mock()

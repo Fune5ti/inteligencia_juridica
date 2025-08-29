@@ -16,11 +16,9 @@ class ExtractRequest(BaseModel):
 
 
 class ExtractResponse(BaseModel):
-    case_id: str
     resume: str
-    timeline: list[dict]  # Placeholder structure; refine later
-    evidence: list[dict]  # Placeholder structure; refine later
-    persisted_at: datetime
+    timeline: list[dict]
+    evidence: list[dict]
 
 
 class ExtractService:
@@ -54,8 +52,8 @@ class ExtractService:
                     }
                 )
                 if model_output.get("timeline"):
-                    timeline.extend(model_output["timeline"]) 
-                evidence = model_output.get("evidence", evidence)  
+                    timeline.extend(model_output["timeline"])
+                evidence = model_output.get("evidence", evidence)
             except Exception as exc:  # pragma: no cover - best effort
                 timeline.append(
                     {
@@ -66,11 +64,9 @@ class ExtractService:
                 )
 
         return ExtractResponse(
-            case_id=data.case_id,
             resume=resume,
             timeline=timeline,
             evidence=evidence,
-            persisted_at=now,
         )
 
     # ------------------------------------------------------------------

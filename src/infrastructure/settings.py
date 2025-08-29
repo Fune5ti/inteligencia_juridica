@@ -3,6 +3,7 @@ from __future__ import annotations
 from functools import lru_cache
 from typing import Dict, Any
 from pydantic import BaseModel, Field
+import os
 
 try:  
     from dotenv import load_dotenv
@@ -37,10 +38,7 @@ class Settings(BaseModel):
     gemini_api_key: str | None = Field(default=None, validation_alias=GEMINI_API_KEY_ENV)
     gemini_model: str = Field(default="gemini-1.5-flash", validation_alias=GEMINI_MODEL_ENV)
 
-    model_config = {
-        "extra": "ignore",  # Ignore unexpected vars
-        "populate_by_name": True,
-    }
+    model_config = {"extra": "ignore", "populate_by_name": True}
 
     # ------------------------------------------------------------------
     # Structured config helpers
@@ -72,7 +70,13 @@ def get_settings() -> Settings:
     lru_cache ensures we only parse environment once per process.
     """
 
-    return Settings()  # type: ignore[arg-type]
+    return Settings(
+        app_name=os.getenv(APP_NAME_ENV, "inteligencia_juridica"),
+        stage=os.getenv(STAGE_ENV, "dev"),
+        llm_model=os.getenv(LLM_MODEL_ENV, "dummy-model"),
+        gemini_api_key=os.getenv(GEMINI_API_KEY_ENV),
+        gemini_model=os.getenv(GEMINI_MODEL_ENV, "gemini-1.5-flash"),
+    )
 
 
 __all__ = [

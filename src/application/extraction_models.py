@@ -5,16 +5,16 @@ from typing import List
 
 
 class Event(BaseModel):
-    event_id: str = Field(min_length=1)
+    event_id: int
     event_name: str
     event_description: str
-    event_date: str  # Keep string to avoid parsing complexities (expect ISO)
+    event_date: str  # Keep string (DD/MM/YYYY or ISO) as provided
     event_page_init: int
     event_page_end: int
 
 
 class Evidence(BaseModel):
-    evidence_id: str = Field(min_length=1)
+    evidence_id: int
     evidence_name: str
     evidence_flaw: str
     evidence_page_init: int

@@ -69,19 +69,13 @@ class GeminiClient:
         parsed = self._parse_json_from_text(raw_text)
         try:
             validated = CaseExtraction(**parsed)
-            return {
-                "resume": validated.resume,
-                "timeline": [e.model_dump() for e in validated.timeline],
-                "evidence": [e.model_dump() for e in validated.evidence],
-                "raw_model_output": raw_text,
-            }
+            return validated.model_dump()
         except Exception:
-            # Return fallback with raw output for debugging
+            # Fallback retains structured keys plus diagnostics
             return {
                 "resume": parsed.get("resume") or "(empty resume)",
                 "timeline": parsed.get("timeline") or [],
                 "evidence": parsed.get("evidence") or [],
-                "raw_model_output": raw_text,
                 "validation_error": True,
             }
 

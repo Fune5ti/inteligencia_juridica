@@ -17,12 +17,13 @@ def test_post_extract_endpoint():
     mock_resp.headers = {"Content-Type": "application/pdf"}
     mock_resp.raise_for_status = Mock()
 
-    with patch("src.application.extract_service.requests.get", return_value=mock_resp):
+    with patch("src.application.extract_service.requests.get", return_value=mock_resp), patch(
+        "src.application.extract_service.get_gemini_client", return_value=None
+    ):
         resp = client.post("/extract", json=payload)
     assert resp.status_code == 200
     data = resp.json()
-    assert data["case_id"] == payload["case_id"]
+    assert set(data.keys()) == {"resume", "timeline", "evidence"}
     assert data["resume"] == "PDF downloaded"
     assert isinstance(data["timeline"], list) and data["timeline"][0]["stage"] == "download_pdf"
     assert isinstance(data["evidence"], list)
-    assert "persisted_at" in data
