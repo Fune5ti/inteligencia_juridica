@@ -8,6 +8,7 @@ import requests
 from pydantic import BaseModel, HttpUrl, Field
 from ..infrastructure.gemini_client import get_gemini_client, GeminiClient
 from ..infrastructure.pdf_downloader import get_pdf_downloader, RequestsPdfDownloader
+from ..infrastructure.case_repository import CaseRepository
 from .extraction_models import CaseExtraction, Event, Evidence
 
 
@@ -82,6 +83,14 @@ class ExtractService:
                 )
                 if debug_payload is not None:
                     debug_payload["error"] = str(exc)
+
+        # Persist if DB configured (simple check: attempt repository init)
+        try:
+            repo = CaseRepository()
+            repo.save_extraction(data.case_id, CaseExtraction(resume=resume, timeline=timeline, evidence=evidence))  # type: ignore[arg-type]
+        except Exception:
+            if debug_payload is not None:
+                debug_payload.setdefault("persistence_error", True)
 
         return ExtractResponse(
             resume=resume,

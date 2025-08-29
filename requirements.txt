@@ -13,5 +13,8 @@ requests==2.32.3
 google-generativeai==0.7.2
 pypdf==4.2.0
 python-multipart==0.0.9
+SQLAlchemy==2.0.31
+psycopg[binary]==3.2.9
+alembic==1.13.2
 
 # Optional ML / LangChain extras moved to requirements-ml.txt to avoid numpy build issues on Python 3.13
