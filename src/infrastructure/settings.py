@@ -26,6 +26,7 @@ DB_PORT_ENV = "POSTGRES_PORT"
 DB_USER_ENV = "POSTGRES_USER"
 DB_PASSWORD_ENV = "POSTGRES_PASSWORD"
 DB_NAME_ENV = "POSTGRES_DB"
+API_KEYS_ENV = "API_KEYS"  # Comma-separated list of allowed API keys
 
 
 class Settings(BaseModel):
@@ -48,6 +49,7 @@ class Settings(BaseModel):
     db_user: str = Field(default="postgres", validation_alias=DB_USER_ENV)
     db_password: str = Field(default="postgres", validation_alias=DB_PASSWORD_ENV)
     db_name: str = Field(default="inteligencia_juridica", validation_alias=DB_NAME_ENV)
+    api_keys_raw: str | None = Field(default=None, validation_alias=API_KEYS_ENV)
 
     model_config = {"extra": "ignore", "populate_by_name": True}
 
@@ -82,6 +84,11 @@ class Settings(BaseModel):
             "stage": self.stage,
         }
 
+    def api_keys(self) -> list[str]:
+        if not self.api_keys_raw:
+            return []
+        return [k.strip() for k in self.api_keys_raw.split(",") if k.strip()]
+
 
 @lru_cache(maxsize=1)
 def get_settings() -> Settings:
@@ -101,6 +108,7 @@ def get_settings() -> Settings:
     db_user=os.getenv(DB_USER_ENV, "postgres"),
     db_password=os.getenv(DB_PASSWORD_ENV, "postgres"),
     db_name=os.getenv(DB_NAME_ENV, "inteligencia_juridica"),
+    api_keys_raw=os.getenv(API_KEYS_ENV),
     )
 
 
@@ -118,4 +126,5 @@ __all__ = [
     "DB_USER_ENV",
     "DB_PASSWORD_ENV",
     "DB_NAME_ENV",
+    "API_KEYS_ENV",
 ]
