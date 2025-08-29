@@ -93,4 +93,42 @@ class CaseRepository:
             if close:
                 session.close()
 
+    def list_cases(self, *, limit: int = 100, offset: int = 0) -> list[tuple[str, CaseExtraction]]:
+        """Return a paginated list of (case_id, CaseExtraction).
+
+        Relationships are loaded lazily; we iterate to build structured models.
+        """
+        session = self._external_session or self._Session()
+        close = self._external_session is None
+        try:
+            query = session.query(CaseORM).order_by(CaseORM.case_id).offset(offset).limit(limit)
+            results: list[tuple[str, CaseExtraction]] = []
+            for db_case in query.all():
+                timeline = [
+                    {
+                        "event_id": t.event_id,
+                        "event_name": t.event_name,
+                        "event_description": t.event_description,
+                        "event_date": t.event_date,
+                        "event_page_init": t.event_page_init,
+                        "event_page_end": t.event_page_end,
+                    }
+                    for t in sorted(db_case.timelines, key=lambda x: x.event_id)
+                ]
+                evidence = [
+                    {
+                        "evidence_id": e.evidence_id,
+                        "evidence_name": e.evidence_name,
+                        "evidence_flaw": e.evidence_flaw,
+                        "evidence_page_init": e.evidence_page_init,
+                        "evidence_page_end": e.evidence_page_end,
+                    }
+                    for e in sorted(db_case.evidences, key=lambda x: x.evidence_id)
+                ]
+                results.append((db_case.case_id, CaseExtraction(resume=db_case.resume, timeline=timeline, evidence=evidence)))  # type: ignore
+            return results
+        finally:
+            if close:
+                session.close()
+
 __all__ = ["CaseRepository"]

@@ -11,6 +11,8 @@ from ..infrastructure.pdf_downloader import get_pdf_downloader
 from ..infrastructure.gemini_client import get_gemini_client
 from ..infrastructure.auth import require_api_key
 from ..infrastructure.job_repository import ExtractionJobRepository
+from ..infrastructure.case_repository import CaseRepository
+from pydantic import BaseModel
 
 api_router = APIRouter(
 	tags=["extraction"],
@@ -19,6 +21,18 @@ api_router = APIRouter(
 		500: {"description": "Internal server error"},
 	},
 )
+
+
+class CaseSummary(BaseModel):
+	case_id: str
+	resume: str
+
+
+class CaseDetail(BaseModel):
+	case_id: str
+	resume: str
+	timeline: list[dict]
+	evidence: list[dict]
 
 
 @api_router.post(
@@ -172,4 +186,76 @@ async def get_job_status(job_id: str):
 	if not job:
 		raise HTTPException(status_code=404, detail="Job not found")
 	return job
+
+
+@api_router.get(
+	"/cases",
+	dependencies=[Depends(require_api_key)],
+	tags=["cases"],
+	summary="List cases",
+	description="Paginated list of stored cases (without full timeline/evidence to reduce payload).",
+	responses={
+		200: {
+			"description": "List of cases",
+			"content": {
+				"application/json": {
+					"example": {
+						"items": [
+							{"case_id": "CASE12345", "resume": "Resumo conciso..."}
+						],
+						"count": 1,
+						"limit": 50,
+						"offset": 0
+					}
+				}
+			},
+		}
+	},
+)
+async def list_cases(limit: int = 50, offset: int = 0):
+	repo = CaseRepository()
+	limit = min(max(limit, 1), 200)
+	data = repo.list_cases(limit=limit, offset=offset)
+	items = [CaseSummary(case_id=c_id, resume=extraction.resume).model_dump() for c_id, extraction in data]
+	return {"items": items, "count": len(items), "limit": limit, "offset": offset}
+
+
+@api_router.get(
+	"/cases/{case_id}",
+	dependencies=[Depends(require_api_key)],
+	tags=["cases"],
+	summary="Get case by ID",
+	description="Retrieve full stored case including timeline and evidence arrays.",
+	responses={
+		200: {
+			"description": "Case detail",
+			"content": {
+				"application/json": {
+					"example": {
+						"case_id": "CASE12345",
+						"resume": "Resumo conciso do caso...",
+						"timeline": [
+							{"event_id": 0, "event_name": "Marco Inicial", "event_description": "...", "event_date": "22/10/2024", "event_page_init": 1, "event_page_end": 2}
+						],
+						"evidence": [
+							{"evidence_id": 0, "evidence_name": "Procuração", "evidence_flaw": "Sem inconsistências", "evidence_page_init": 10, "evidence_page_end": 10}
+						]
+					}
+				}
+			},
+		},
+		404: {"description": "Case not found"},
+	},
+)
+async def get_case(case_id: str):
+	repo = CaseRepository()
+	extraction = repo.get_case(case_id)
+	if not extraction:
+		raise HTTPException(status_code=404, detail="Case not found")
+	return CaseDetail(
+		case_id=case_id,
+		resume=extraction.resume,
+		timeline=[e.model_dump() for e in extraction.timeline],
+		evidence=[e.model_dump() for e in extraction.evidence],
+	)
 
