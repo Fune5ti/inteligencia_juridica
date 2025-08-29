@@ -7,6 +7,7 @@ import uuid
 import requests
 from pydantic import BaseModel, HttpUrl, Field
 from ..infrastructure.gemini_client import get_gemini_client, GeminiClient
+from .extraction_models import CaseExtraction, Event, Evidence
 
 
 class ExtractRequest(BaseModel):

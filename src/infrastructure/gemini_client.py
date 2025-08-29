@@ -11,6 +11,7 @@ except Exception:  # pragma: no cover - soft import
     genai = None  # type: ignore
 
 from .settings import get_settings
+from ..application.extraction_models import CaseExtraction
 
 
 class GeminiClient:
@@ -66,12 +67,23 @@ class GeminiClient:
             raw_text = "\n".join(parts)
 
         parsed = self._parse_json_from_text(raw_text)
-        return {
-            "resume": parsed.get("resume") or "(empty resume)",
-            "timeline": parsed.get("timeline") or [],
-            "evidence": parsed.get("evidence") or [],
-            "raw_model_output": raw_text,
-        }
+        try:
+            validated = CaseExtraction(**parsed)
+            return {
+                "resume": validated.resume,
+                "timeline": [e.model_dump() for e in validated.timeline],
+                "evidence": [e.model_dump() for e in validated.evidence],
+                "raw_model_output": raw_text,
+            }
+        except Exception:
+            # Return fallback with raw output for debugging
+            return {
+                "resume": parsed.get("resume") or "(empty resume)",
+                "timeline": parsed.get("timeline") or [],
+                "evidence": parsed.get("evidence") or [],
+                "raw_model_output": raw_text,
+                "validation_error": True,
+            }
 
     def _parse_json_from_text(self, text: str) -> Dict[str, Any]:
         try:
