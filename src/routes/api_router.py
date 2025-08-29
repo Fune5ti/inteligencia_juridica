@@ -12,10 +12,53 @@ from ..infrastructure.gemini_client import get_gemini_client
 from ..infrastructure.auth import require_api_key
 from ..infrastructure.job_repository import ExtractionJobRepository
 
-api_router = APIRouter()
+api_router = APIRouter(
+	tags=["extraction"],
+	responses={
+		401: {"description": "Unauthorized – missing or invalid API key"},
+		500: {"description": "Internal server error"},
+	},
+)
 
 
-@api_router.post("/extract", response_model=ExtractResponse, dependencies=[Depends(require_api_key)])
+@api_router.post(
+	"/extract",
+	response_model=ExtractResponse,
+	dependencies=[Depends(require_api_key)],
+	summary="Synchronous extraction",
+	description="Download the PDF, run structured extraction and return the result in a single response.",
+	responses={
+		200: {
+			"description": "Successful extraction",
+			"content": {
+				"application/json": {
+					"example": {
+						"resume": "Resumo conciso do caso...",
+						"timeline": [
+							{
+								"event_id": 0,
+								"event_name": "Marco Inicial",
+								"event_description": "Ajuizamento da ação...",
+								"event_date": "22/10/2024",
+								"event_page_init": 1,
+								"event_page_end": 13
+							}
+						],
+						"evidence": [
+							{
+								"evidence_id": 0,
+								"evidence_name": "Procuração",
+								"evidence_flaw": "Sem inconsistências",
+								"evidence_page_init": 16,
+								"evidence_page_end": 16
+							}
+						]
+					}
+				}
+			},
+		}
+	},
+)
 async def extract_endpoint(
 	payload: ExtractRequest,
 	pdf_downloader=Depends(get_pdf_downloader),
@@ -26,10 +69,28 @@ async def extract_endpoint(
 
 
 class AsyncExtractRequest(ExtractRequest):
+	"""Request body for asynchronous extraction.
+
+	callback_url (optional): Public URL to receive a POST webhook when the job finishes.
+	"""
 	callback_url: str | None = None
 
 
-@api_router.post("/extract/async", dependencies=[Depends(require_api_key)])
+@api_router.post(
+	"/extract/async",
+	dependencies=[Depends(require_api_key)],
+	summary="Asynchronous extraction (fire-and-poll / webhook)",
+	description=(
+		"Enqueue an extraction job. Returns a job identifier immediately. "
+		"Use the job status endpoint to poll or provide a callback_url to receive a webhook when completed."
+	),
+	responses={
+		200: {
+			"description": "Job accepted",
+			"content": {"application/json": {"example": {"job_id": "uuid", "status": "pending"}}},
+		}
+	},
+)
 async def extract_async_endpoint(
 	payload: AsyncExtractRequest,
 	background_tasks: BackgroundTasks,
@@ -80,7 +141,31 @@ async def extract_async_endpoint(
 	return {"job_id": job_id, "status": "pending"}
 
 
-@api_router.get("/extract/jobs/{job_id}", dependencies=[Depends(require_api_key)])
+@api_router.get(
+	"/extract/jobs/{job_id}",
+	dependencies=[Depends(require_api_key)],
+	summary="Get extraction job status",
+	description="Retrieve current status and metadata for a previously submitted asynchronous extraction job.",
+	responses={
+		200: {
+			"description": "Job status",
+			"content": {
+				"application/json": {
+					"example": {
+						"id": "uuid",
+						"case_id": "CASE12345",
+						"status": "completed",
+						"callback_url": "https://webhook.site/your-id",
+						"error": None,
+						"created_at": "2024-01-01T12:00:00Z",
+						"updated_at": "2024-01-01T12:03:00Z"
+					}
+				}
+			},
+		},
+		404: {"description": "Job not found"},
+	},
+)
 async def get_job_status(job_id: str):
 	repo = ExtractionJobRepository()
 	job = repo.get(job_id)

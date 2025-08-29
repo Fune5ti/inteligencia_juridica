@@ -1,11 +1,13 @@
 from __future__ import annotations
-from fastapi import Header, HTTPException, status, Depends
+from fastapi import HTTPException, status, Depends, Security
+from fastapi.security.api_key import APIKeyHeader
 from .settings import get_settings
 
 API_KEY_HEADER = "X-API-Key"
+_api_key_header = APIKeyHeader(name=API_KEY_HEADER, auto_error=False, description="API key issued by the service")
 
 
-def get_api_key(x_api_key: str | None = Header(default=None, alias=API_KEY_HEADER)) -> str:
+def get_api_key(x_api_key: str | None = Security(_api_key_header)) -> str:
     settings = get_settings()
     allowed = settings.api_keys()
     if not allowed:  
