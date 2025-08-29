@@ -10,6 +10,7 @@ types-requests==2.32.0.20240622
 python-dotenv==1.0.1
 mangum==0.17.0
 requests==2.32.3
-langchain==0.2.12
 google-generativeai==0.7.2
-langchain-google-genai==1.0.7
+pypdf==4.2.0
+
+# Optional ML / LangChain extras moved to requirements-ml.txt to avoid numpy build issues on Python 3.13

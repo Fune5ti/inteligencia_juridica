@@ -51,10 +51,8 @@ def test_extract_endpoint_with_gemini_analysis():
     assert resp.status_code == 200
     data = resp.json()
     assert data["resume"] == "Sample resume"
-    # timeline should include download + gemini_analysis + model provided event
-    stages = [t.get("stage") for t in data["timeline"]]
-    assert "download_pdf" in stages
-    assert "gemini_analysis" in stages
+    # timeline now only includes model-provided events (no internal pipeline stages)
+    stages = [t.get("stage") for t in data["timeline"] if isinstance(t, dict)]
     # Evidence list forwarded
     assert len(data["evidence"]) == 1
     assert data["evidence"][0]["evidence_id"] == 10

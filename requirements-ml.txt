@@ -1,0 +1,7 @@
+# Optional ML / LangChain dependencies (install separately if needed)
+# Use: pip install -r requirements-ml.txt
+
+langchain==0.2.12
+langchain-google-genai==1.0.7
+# numpy left implicit: modern wheels for Py 3.13 may not yet be published; if install fails,
+# consider using Python 3.12 for LangChain stack or install a pre-release wheel.
