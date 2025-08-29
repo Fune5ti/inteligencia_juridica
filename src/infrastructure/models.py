@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from sqlalchemy import String, Text, Integer, ForeignKey
+from sqlalchemy import String, Text, Integer, ForeignKey, DateTime
+from datetime import datetime
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from .db import Base
 
@@ -37,4 +38,15 @@ class EvidenceORM(Base):
     evidence_page_end: Mapped[int] = mapped_column(Integer)
     case: Mapped[CaseORM] = relationship(back_populates="evidences")  # type: ignore
 
-__all__ = ["CaseORM", "TimelineEventORM", "EvidenceORM"]
+
+class ExtractionJobORM(Base):
+    __tablename__ = "extraction_jobs"
+    id: Mapped[str] = mapped_column(String(50), primary_key=True)
+    case_id: Mapped[str] = mapped_column(String(100), index=True)
+    status: Mapped[str] = mapped_column(String(20), index=True)
+    callback_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    error: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=datetime.utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=datetime.utcnow, onupdate=datetime.utcnow)
+
+__all__ = ["CaseORM", "TimelineEventORM", "EvidenceORM", "ExtractionJobORM"]

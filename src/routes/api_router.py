@@ -1,4 +1,6 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, BackgroundTasks, HTTPException
+import uuid
+import httpx
 from ..application.extract_service import (
 	ExtractRequest,
 	ExtractResponse,
@@ -8,6 +10,7 @@ from ..application.extract_service import (
 from ..infrastructure.pdf_downloader import get_pdf_downloader
 from ..infrastructure.gemini_client import get_gemini_client
 from ..infrastructure.auth import require_api_key
+from ..infrastructure.job_repository import ExtractionJobRepository
 
 api_router = APIRouter()
 
@@ -20,4 +23,68 @@ async def extract_endpoint(
 ) -> ExtractResponse:
 	service = get_extract_service(pdf_downloader=pdf_downloader, gemini_client=gemini_client)
 	return await service.extract(payload)
+
+
+class AsyncExtractRequest(ExtractRequest):
+	callback_url: str | None = None
+
+
+@api_router.post("/extract/async", dependencies=[Depends(require_api_key)])
+async def extract_async_endpoint(
+	payload: AsyncExtractRequest,
+	background_tasks: BackgroundTasks,
+	pdf_downloader=Depends(get_pdf_downloader),
+	gemini_client=Depends(get_gemini_client),
+):
+	job_id = str(uuid.uuid4())
+	repo = ExtractionJobRepository()
+	repo.create_job(job_id, payload.case_id, payload.callback_url)
+
+	service = get_extract_service(pdf_downloader=pdf_downloader, gemini_client=gemini_client)
+
+	async def run_job():
+		repo.mark_running(job_id)
+		try:
+			result = await service.extract(payload)
+			repo.mark_success(job_id)
+			if payload.callback_url:
+				try:
+					async with httpx.AsyncClient(timeout=10) as client:
+						await client.post(payload.callback_url, json={
+							"job_id": job_id,
+							"case_id": payload.case_id,
+							"status": "completed",
+							"result": {
+								"resume": result.resume,
+								"timeline": [e.model_dump() for e in result.timeline],
+								"evidence": [e.model_dump() for e in result.evidence],
+							}
+						})
+				except Exception:
+					pass
+		except Exception as exc:  
+			repo.mark_error(job_id, str(exc))
+			if payload.callback_url:
+				try:
+					async with httpx.AsyncClient(timeout=10) as client:
+						await client.post(payload.callback_url, json={
+							"job_id": job_id,
+							"case_id": payload.case_id,
+							"status": "failed",
+							"error": str(exc),
+						})
+				except Exception:
+					pass
+
+	background_tasks.add_task(run_job)
+	return {"job_id": job_id, "status": "pending"}
+
+
+@api_router.get("/extract/jobs/{job_id}", dependencies=[Depends(require_api_key)])
+async def get_job_status(job_id: str):
+	repo = ExtractionJobRepository()
+	job = repo.get(job_id)
+	if not job:
+		raise HTTPException(status_code=404, detail="Job not found")
+	return job
 
