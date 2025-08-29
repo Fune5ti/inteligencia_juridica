@@ -80,3 +80,65 @@ set INTJ_DEBUG=1
 - Missing `google-generativeai`: reinstall base requirements.
 - Large PDF: only first ~25 pages are sampled in fallback mode to control token usage.
 
+## API Key Authentication
+
+The API is protected using a simple static API key mechanism.
+
+### Configuration
+Provide one or more allowed keys via the `API_KEYS` environment variable (comma‑separated):
+```
+API_KEYS=dev-key-1,dev-key-2
+```
+In Windows PowerShell for a single session:
+```
+$Env:API_KEYS="dev-key-1,dev-key-2"
+```
+They are also demonstrated in `.env.example`. Empty / missing `API_KEYS` means all requests are rejected (fail‑closed).
+
+### Sending the key
+Clients must include the header:
+```
+X-API-Key: <your-key>
+```
+
+Example request (PowerShell):
+```
+Invoke-RestMethod -Method Post `
+  -Uri http://localhost:8000/extract `
+  -Headers @{"X-API-Key"="dev-key-1"; "Content-Type"="application/json"} `
+  -Body '{"pdf_url":"https://example.com/test.pdf","case_id":"CASE12345"}'
+```
+
+### Async extraction with callback
+Submit an asynchronous job (immediate 202-like behavior) and receive a callback when processing completes:
+```
+Invoke-RestMethod -Method Post `
+  -Uri http://localhost:8000/extract/async `
+  -Headers @{"X-API-Key"="dev-key-1"; "Content-Type"="application/json"} `
+  -Body '{"pdf_url":"https://example.com/test.pdf","case_id":"CASE12345","callback_url":"https://webhook.site/your-id"}'
+```
+Poll job status:
+```
+Invoke-RestMethod -Uri http://localhost:8000/extract/jobs/<job_id> -Headers @{"X-API-Key"="dev-key-1"}
+```
+Callback (success) payload shape:
+```json
+{
+  "job_id": "<uuid>",
+  "case_id": "CASE12345",
+  "status": "completed",
+  "result": {
+    "resume": "...",
+    "timeline": [ {"event_id":0, ...} ],
+    "evidence": [ {"evidence_id":0, ...} ]
+  }
+}
+```
+
+### Common Errors
+| Status | Reason | Fix |
+|--------|--------|-----|
+| 401 | Missing header | Add `X-API-Key` header |
+| 401 | Invalid key | Use one from `API_KEYS` env var |
+
+
