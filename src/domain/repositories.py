@@ -16,3 +16,9 @@ class StorageRepository(ABC):
 class ILlmClient(Protocol):
     async def generate(self, prompt: str, **kwargs: Any) -> str: 
         ...
+
+
+class PdfDownloader(Protocol):
+    def download(self, url: str, case_id: str) -> Any:  # returns Path-like; use Any to avoid circular import
+        """Download a PDF returning a filesystem path. Raises RuntimeError on failure."""
+        ...

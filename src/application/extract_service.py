@@ -7,6 +7,7 @@ import uuid
 import requests
 from pydantic import BaseModel, HttpUrl, Field
 from ..infrastructure.gemini_client import get_gemini_client, GeminiClient
+from ..infrastructure.pdf_downloader import get_pdf_downloader, RequestsPdfDownloader
 from .extraction_models import CaseExtraction, Event, Evidence
 
 
@@ -17,26 +18,30 @@ class ExtractRequest(BaseModel):
 
 class ExtractResponse(BaseModel):
     resume: str
-    timeline: list[dict]
-    evidence: list[dict]
+    timeline: list[Event]
+    evidence: list[Evidence]
     # Optional debug diagnostics (only populated when debug flag enabled)
     debug: dict | None = None
 
 
 class ExtractService:
     """Service responsible for orchestrating extraction pipeline.
+
+    Dependencies are injected (pdf_downloader, gemini_client provider) to honor layered architecture.
     """
 
+    def __init__(self, pdf_downloader: RequestsPdfDownloader, gemini_client: GeminiClient | None):
+        self._pdf_downloader = pdf_downloader
+        self._gemini_client = gemini_client
+
     async def extract(self, data: ExtractRequest, *, debug: bool | None = None) -> ExtractResponse:
-
-        pdf_path = self._download_pdf(data.pdf_url, data.case_id)
-        timeline: list[dict] = []  
-
-        gemini_client = get_gemini_client()
+        pdf_path = self._pdf_downloader.download(str(data.pdf_url), data.case_id)
+        timeline: list[Event] = []
+        gemini_client = self._gemini_client
         resume = "PDF downloaded"
-        evidence: list[dict] = []
+        evidence: list[Evidence] = []
         debug_enabled = debug
-        
+
         if debug_enabled is None:
             import os
             debug_enabled = os.getenv("INTJ_DEBUG", "0") in {"1", "true", "TRUE", "yes", "on"}
@@ -50,15 +55,24 @@ class ExtractService:
                 model_output = gemini_client.analyze_pdf(str(pdf_path), prompt)
                 resume = model_output.get("resume", resume)
                 if model_output.get("timeline"):
-                    timeline.extend(model_output["timeline"])
-                evidence = model_output.get("evidence", evidence)
+                    for ev in model_output["timeline"]:
+                        try:
+                            timeline.append(Event(**ev))
+                        except Exception:
+                            continue
+                raw_evidence = model_output.get("evidence", [])
+                evidence = []
+                for evd in raw_evidence:
+                    try:
+                        evidence.append(Evidence(**evd))
+                    except Exception:
+                        continue
                 if debug_payload is not None:
-
                     if "validation_error" in model_output:
                         debug_payload["validation_error"] = model_output["validation_error"]
                     debug_payload["timeline_count"] = len(model_output.get("timeline", []))
                     debug_payload["evidence_count"] = len(model_output.get("evidence", []))
-            except Exception as exc:  
+            except Exception as exc:  # pragma: no cover
                 timeline.append(
                     {
                         "stage": "gemini_error",
@@ -79,24 +93,7 @@ class ExtractService:
     # ------------------------------------------------------------------
     # Internal helpers
     # ------------------------------------------------------------------
-    def _download_pdf(self, url: str, case_id: str) -> Path:
-        """Download PDF to a temporary file.
-
-        Returns path to the saved file. Raises RuntimeError on failure.
-        """
-        try:
-            resp = requests.get(url, timeout=15)
-            resp.raise_for_status()
-            if "pdf" not in resp.headers.get("Content-Type", "").lower():
-                # Still save but note could refine later
-                pass
-            tmp_dir = Path(tempfile.gettempdir())
-            filename = f"{case_id}_{uuid.uuid4().hex}.pdf"
-            path = tmp_dir / filename
-            path.write_bytes(resp.content)
-            return path
-        except Exception as exc:  # Broad catch; convert to domain-level error
-            raise RuntimeError(f"Failed to download PDF: {exc}") from exc
+    # _download_pdf removed in favor of infrastructure adapter
 
     def _build_prompt(self) -> str:
         # Multilingual + strict JSON output instructions. Provide both EN and PT to reduce ambiguity.
@@ -139,8 +136,14 @@ class ExtractService:
         )
 
 
-def get_extract_service() -> ExtractService:  # Simple factory (could add DI later)
-    return ExtractService()
+def get_extract_service(
+    pdf_downloader: RequestsPdfDownloader | None = None,
+    gemini_client: GeminiClient | None = None,
+) -> ExtractService:
+    return ExtractService(
+        pdf_downloader=pdf_downloader or get_pdf_downloader(),
+        gemini_client=gemini_client if gemini_client is not None else get_gemini_client(),
+    )
 
 __all__ = [
     "ExtractRequest",

@@ -5,13 +5,18 @@ from ..application.extract_service import (
 	get_extract_service,
 	ExtractService,
 )
+from ..infrastructure.pdf_downloader import get_pdf_downloader
+from ..infrastructure.gemini_client import get_gemini_client
 
 api_router = APIRouter()
 
 
 @api_router.post("/extract", response_model=ExtractResponse)
 async def extract_endpoint(
-	payload: ExtractRequest, service: ExtractService = Depends(get_extract_service)
+	payload: ExtractRequest,
+	pdf_downloader=Depends(get_pdf_downloader),
+	gemini_client=Depends(get_gemini_client),
 ) -> ExtractResponse:
+	service = get_extract_service(pdf_downloader=pdf_downloader, gemini_client=gemini_client)
 	return await service.extract(payload)
 

@@ -1,6 +1,10 @@
-from unittest.mock import patch, Mock
+from unittest.mock import Mock
+from pathlib import Path
+import tempfile
 from fastapi.testclient import TestClient
 from src.main import app
+from src.infrastructure.pdf_downloader import get_pdf_downloader
+from src.infrastructure.gemini_client import get_gemini_client
 
 client = TestClient(app)
 
@@ -11,11 +15,11 @@ def test_extract_endpoint_with_gemini_analysis():
         "case_id": "12345-00.2024.8.00.0000",
     }
 
-    # Mock PDF download
-    mock_pdf_resp = Mock()
-    mock_pdf_resp.content = b"%PDF-1.4 test pdf"
-    mock_pdf_resp.headers = {"Content-Type": "application/pdf"}
-    mock_pdf_resp.raise_for_status = Mock()
+    # Mock PDF downloader adapter
+    tmp_pdf = Path(tempfile.gettempdir()) / "test2.pdf"
+    tmp_pdf.write_bytes(b"%PDF-1.4 test pdf")
+    mock_downloader = Mock()
+    mock_downloader.download.return_value = tmp_pdf
 
     fake_model_output = {
         "resume": "Sample resume",
@@ -43,10 +47,13 @@ def test_extract_endpoint_with_gemini_analysis():
     mock_gemini_client = Mock()
     mock_gemini_client.analyze_pdf.return_value = fake_model_output
 
-    with patch("src.application.extract_service.requests.get", return_value=mock_pdf_resp), patch(
-        "src.application.extract_service.get_gemini_client", return_value=mock_gemini_client
-    ):
+    app.dependency_overrides[get_pdf_downloader] = lambda: mock_downloader
+    app.dependency_overrides[get_gemini_client] = lambda: mock_gemini_client
+    try:
         resp = client.post("/extract", json=payload)
+    finally:
+        app.dependency_overrides.pop(get_pdf_downloader, None)
+        app.dependency_overrides.pop(get_gemini_client, None)
 
     assert resp.status_code == 200
     data = resp.json()
